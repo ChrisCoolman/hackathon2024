@@ -1,77 +1,185 @@
-// Game configuration
-var config = {
-  type: Phaser.AUTO,
-  width: 800,
-  height: 600,
-  scene: {
-    preload: preload,
-    create: create,
-    update: update
-  }
+let config = {
+    type: Phaser.CANVAS,
+    width: 800,
+    height: 600,
+    backgroundColor: '#00FF7B',
+    canvas: document.getElementById("gameCanvas"),
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { y: 0 },
+            debug: true
+        }
+    },
+    scene: {
+        preload: preload,
+        create: create,
+        update: update
+    }
 };
 
-var game = new Phaser.Game(config);
+let game = new Phaser.Game(config);
+let w, a, s, d, e;
+let player;
+let fireball;
+let fire;
+let erel;
+let enemyfire;
 
-// Global variables
-var player;
-var cursors;
-var bendingPower;
+let enemyhealth = 50;
 
-// Preload assets
+let phealth = 100;
+let phealthtext;
+
+let playerDirection;
+
+let worldScale = 4;
+
 function preload() {
-  this.load.image('aang', 'path/to/aang.png');
-  // Load other assets (scrolls, enemies, etc.)
+    //this.load.image("guy", "assets/imgs/stick_guy.png");
+    this.load.spritesheet("guy", 'assets/imgs/fire_bender.png', { frameWidth: 64, frameHeight: 64 });
+    this.load.image("fireball", "assets/imgs/fireball.png");
+    this.load.image("stickguy", "assets/imgs/fireball.png");
 }
 
-// Create game objects
 function create() {
-  // Create player
-  player = this.physics.add.sprite(400, 300, 'aang');
-  player.setOrigin(0.5);
-  this.physics.world.setBoundsCollision(true, true, true, true);
-  cursors = this.input.keyboard.createCursorKeys();
+    // add keyboard input
+    w = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+    s = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S);
+    a = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+    d = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+    e = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    // add player
+    player = this.physics.add.sprite(400, 200, "guy");
 
-  // Set up collisions
-  this.physics.add.collider(player, enemies, handlePlayerEnemyCollision, null, this);
+    phealthtext = this.add.text(16, 16, 'Player Health: 100', { fontSize: '32px', fill: '#000' });
 
-  // Create scrolls and set up collisions
+    //colide
+    player.setCollideWorldBounds(true);
 
-  // Set up UI elements (health bar, score display, etc.)
+    //this.cameras.main.setZoom(1.25);
+    this.anims.create({
+        key: 'left',
+        frames: this.anims.generateFrameNumbers('guy', { start: 8, end: 13 }),
+        frameRate: 10,
+        repeat: -1
+    });
 
-  // Initialize game state variables (score, wave count, etc.)
+    this.anims.create({
+        key: 'turn',
+        frames: [{ key: 'guy', frame: 7 }],
+        frameRate: 20
+    });
+
+    this.anims.create({
+        key: 'right',
+        frames: this.anims.generateFrameNumbers('guy', { start: 0, end: 6 }),
+        frameRate: 10,
+        repeat: -1
+    });
+
+    // fireball
+    fireball = this.physics.add.group({ key: 'fireball' });
+
+    enemies = this.physics.add.group({ key: "stickguy" });
+
+    createEnemy.call(this, 100, 200);
 }
 
-// Update game logic
 function update() {
-  // Player movement
-  if (cursors.left.isDown) {
-    player.setVelocityX(-200);
-  } else if (cursors.right.isDown) {
-    player.setVelocityX(200);
-  } else {
-    player.setVelocityX(0);
-  }
+    if (w.isDown) {
+        player.setVelocityY(-160);
+        playerDirection = "up";
+        player.anims.play('turn');
+    }
+    else if (d.isDown) {
+        player.setVelocityX(160);
+        playerDirection = "right";
+        player.anims.play('right');
+    }
+    else if (a.isDown) {
+        player.setVelocityX(-160);
+        playerDirection = "left";
+        player.anims.play('left');
+    }
+    else if (s.isDown) {
+        player.setVelocityY(160);
+        playerDirection = "down";
+        player.anims.play('turn');
+    }
+    else {
+        player.setVelocityX(0);
+        player.setVelocityY(0);
+        player.anims.play('turn');
+    }
 
-  if (cursors.up.isDown) {
-    player.setVelocityY(-200);
-  } else if (cursors.down.isDown) {
-    player.setVelocityY(200);
-  } else {
-    player.setVelocityY(0);
-  }
+    if (e.isDown && erel) {
+        // create fireball
+        let fire = fireball.create(player.x, player.y, "fireball").setScale(worldScale).refreshBody();
+        if (playerDirection == "up") {
+            fire.setVelocityY(-500);
+        }
+        else if (playerDirection == "down") {
+            fire.setVelocityY(500);
+        }
+        else if (playerDirection == "left") {
+            fire.setVelocityX(-500);
+        }
+        else if (playerDirection == "right") {
+            fire.setVelocityX(500);
+        }
+        erel = false;
+    }
+    else if (e.isUp) {
+        erel = true;
+    }
 
-  // Player attacks
+    if (fire && (fire.x > 800 || fire.x < 0 || fire.y > 600 || fire.y < 0)) {
+        fire.disableBody(true, true);
+    }
 
-  // Enemy AI and attacks
-
-  // Check game over condition
-
-  // Update UI elements
 }
 
-// Handle player-enemy collisions
-function handlePlayerEnemyCollision(player, enemy) {
-  // Handle damage and other collision effects
+function createEnemy(x, y) {
+    // Create enemy sprite
+    let enemy = enemies.create(x, y, 'stickguy');
+    this.physics.add.overlap(enemy, fire, killenemy, null, this);
+    // Schedule enemy to shoot
+    this.time.addEvent({
+        delay: 2000,
+        loop: true,
+        callback: function() {
+            enemyShoot.call(this, enemy);
+        },
+        callbackScope: this
+    });
+}
+function enemyShoot(enemy) {
+    // Create fireball
+    enemyfire = fireball.create(enemy.x, enemy.y, 'fireball');
+    this.physics.add.overlap(player, enemyfire, damage, null, this);
+    enemyfire.setVelocityX(400);
 }
 
-// Other game functions (attack mechanics, scrolling, scoring, etc.)
+
+function damage() {
+    phealth -= 1;
+    phealthtext.setText("Player Health: " + phealth);
+
+    if (phealth <= 0) {
+        phealthtext.update("Game Over");
+
+        this.physics.pause();
+
+        player.setTint(0xff0000);
+
+        player.anims.play('turn');
+    }
+}
+
+function killenemy() {
+    enemyhealth--;
+    if (enemyhealth < 0) {
+        enemy.disableBody(true, true);
+    }
+}
